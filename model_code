@@ -1,0 +1,249 @@
+
+
+
+#CIFAR10 Image Classification
+
+
+
+# importing necessary libraries for image classification
+import pandas as pd
+import seaborn as sns
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
+import tensorflow as tf
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.models import Model
+from tensorflow.keras import layers
+from tensorflow.keras.applications import VGG16,VGG19
+from tensorflow.keras.applications.vgg16 import preprocess_input
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
+#loading cifar10 dataset into training, testin, features and labels
+(features_train, label_train), (features_test, label_test) = tf.keras.datasets.cifar10.load_data()
+features_train.shape
+label_train.shape
+features_test.shape
+label_test.shape
+#using flatten function to change the y train into a straight matrix
+batch_size=16
+img_height = 32
+img_width = 32
+label_train
+# Labels Explaination
+- 0: airplane
+- 1: automobile
+- 2: bird
+- 3: cat
+- 4: deer
+- 5: dog
+- 6: frog
+- 7: horse
+- 8: ship
+- 9: truck
+classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+class_num = [0,1,2,3,4,5,6,7,8,9]
+
+data = np.array(label_train).flatten()
+df = pd.DataFrame({'class': data})
+
+'''
+Create a bar plot using seaborn.barplot of the number of elements in each
+category of the entire dataset.Use markdown to comment on how well balanced the
+dataset is.
+'''
+#counting the number of values assignned for each class
+df['class'].value_counts().sort_index()
+#this will print the value count of each index or the class we have assiged
+# plotting a barplot
+sns.barplot(x=df['class'].value_counts().sort_index().index, y=df['class'].value_counts().sort_index().values)
+plt.xlabel('Class')
+plt.ylabel('Count')
+plt.title('Frequency of Classes in dataset')
+plt.show()
+
+batch_size=8
+img_height = 32
+img_width = 32
+channel = 3
+# Observation
+- We could clearly see from this barplot that the data is equally distributed
+among the 10 classes we have defined and this means the data is quite equal. So
+each cluster is well defined with each having a total of 5000 images inside.
+#Training,Testing and Validation Split:
+- We will split the test data we made into 2 categorical sets:
+- Validation and Testing
+
+# Alloting 30% to testing data from x_test
+x_val, x_test, y_val, y_test = train_test_split(
+    features_train, label_train, test_size=0.2, random_state=42)
+#printing out the shape of x_val to check the matrix
+x_val.shape
+x_test.shape
+'''
+Create train, test, and validation data generators using
+tensorflow.keras.preprocessing.image.ImageDataGenerator; each should scale the
+data by dividing by 255, and the training generator should also use data
+augmentation.
+'''
+# declarign train,test and validation image generator
+train_img_generator = ImageDataGenerator(rescale=1./255
+                                   , rotation_range=20
+                                   , width_shift_range=0.1
+                                   , height_shift_range=0.1
+                                   , shear_range=0.2
+                                   , zoom_range=0.2
+                                   , horizontal_flip=True
+                                   , fill_mode='nearest'
+                                   ,preprocessing_function=preprocess_input
+                                   )
+val_img_generator = ImageDataGenerator(rescale=1./255)
+test_img_generator = ImageDataGenerator(rescale=1./255)
+train_data_gen = train_img_generator.flow(features_train, label_train, batch_size=batch_size)
+val_data_gen = val_img_generator.flow(features_test, label_test, batch_size=batch_size)
+test_data_gen = test_img_generator.flow(features_test, label_test, batch_size=batch_size)
+np.random.seed(8)
+tf.random.set_seed(8)
+# Modeling:
+- Use tf.keras.Sequential to create a convolutional neural network. Use at least two convolution layers and at least two pooling layers. Choose an activation function for each layer, and make sure the input and output dimensions are appropriate for the data. Print a summary of the model using tf.summary.
+
+- Compile the model with a choice of optimizer, sparse_categorical_crossentropy for the loss function, and set the metrics argument equal to ['accuracy'].
+
+- Train the model using the train and validation data generators; record the training accuracy. Experiment with different architectures other hyperparameters to improve upon the results.
+
+- Start a new model by loading one of the models from tensorflow.keras.applications along with the pretrained weights; don't include the top layer. Check if your model comes with preprocess_input function and be sure to use that properly with your data before training. Describe the model you chose using markdown and explain why you think it will work well for this use case.
+
+- Add on a new top layer with appropriate hyperparameter choices. Choose a number of layers to freeze. Print a summary of the model.
+- Compile the model with a choice of optimizer and loss function, and the set the metrics argument equal to ['accuracy'].
+- Train the model using the train and validation data generators; record the training accuracy. Experiment with different architectures, different numbers of frozen layers, and other hyperparameters to improve upon the results.
+# Starting CNN model making
+# declaring some parameters for layering
+cnn_model = tf.keras.Sequential([layers.Conv2D(64, (3, 3), activation='relu', input_shape=(32, 32, 3)),
+    layers.MaxPooling2D((2, 2)),
+    layers.Conv2D(128, (3, 3), activation='relu'),
+    layers.MaxPooling2D((2, 2)),
+    layers.Flatten(),
+    layers.Dense(128, activation='relu'),
+    layers.Dense(10, activation='softmax')
+    ])
+
+cnn_model.summary()
+#setting an optimizer with learning rate
+optimizer = tf.keras.optimizers.Adam(0.001)
+# Compiling our model so we can fit it and train it further for our model
+cnn_model.compile(optimizer=optimizer
+                  , loss='sparse_categorical_crossentropy'
+                  , metrics=['accuracy']
+                  )
+# Fitting our model with different parameters and a total 10 epoch per training
+cnn_history = cnn_model.fit(  train_data_gen,
+    epochs=5,
+    validation_data=val_data_gen
+
+              )
+#generating a summary to see what we have in this model
+#this summary can give us important insights for this data
+cnn_model.summary()
+# Pretrained models Usage
+base_model = VGG16(input_shape=(img_height,img_width,channel),weights='imagenet'
+                  , include_top=False)
+base_model.trainable = False
+base_model.summary()
+model = tf.keras.Sequential([
+    base_model,
+    layers.Flatten(),
+    layers.Dense(128, activation='relu'),
+    layers.Dense(10, activation='softmax')
+])
+
+#using complile so we can fit the model later
+model.compile(loss='sparse_categorical_crossentropy'
+                  , optimizer=optimizer
+                  , metrics=['accuracy']
+                  )
+history_vgg = model.fit(
+                        train_data_gen,
+                        steps_per_epoch=len(features_train) // batch_size,
+                        epochs=5,
+                        validation_data=val_data_gen,
+                        validation_steps=len(x_val) // batch_size
+                        )
+model.summary()
+## Evaluating both models for the best one
+# Evaluate both models
+cnn_eval = cnn_model.evaluate(test_data_gen)
+vgg_eval = model.evaluate(test_data_gen)
+
+#Printing the resuts for both models to select the best one
+print("CNN Model Test Accuracy:", cnn_eval[1])
+print("VGG16 Model Test Accuracy:", vgg_eval[1])
+
+# Creating confisuion matrix for both models
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+
+# Custom CNN Confusion Matrix
+y_pred_cnn = cnn_model.predict(test_data_gen)
+y_pred_classes_cnn = np.argmax(y_pred_cnn, axis=1)
+
+# Flatten the labels for CNN
+y_true_cnn = label_test.flatten()
+
+# Generate and display the confusion matrix for CNN
+cm_cnn = confusion_matrix(y_true_cnn, y_pred_classes_cnn)
+disp_cnn = ConfusionMatrixDisplay(confusion_matrix=cm_cnn, display_labels=classes)
+disp_cnn.plot(cmap='Blues')
+plt.title("Confusion Matrix for Custom CNN")
+plt.show()
+
+# Transfer Learning Confusion Matrix
+y_pred_vgg = model.predict(test_data_gen)
+y_pred_classes_vgg = np.argmax(y_pred_vgg, axis=1)
+
+# Flatten the labels for VGG16
+y_true_vgg = label_test.flatten()
+
+# Generate and display the confusion matrix for VGG16
+cm_vgg = confusion_matrix(y_true_vgg, y_pred_classes_vgg)
+disp_vgg = ConfusionMatrixDisplay(confusion_matrix=cm_vgg, display_labels=classes)
+disp_vgg.plot(cmap='Blues')
+plt.title("Confusion Matrix for VGG16 Transfer Learning")
+plt.show()
+# Predictions: For New Images
+num_images_to_predict = 5
+for i in range(num_images_to_predict):
+    img = x_test[i]
+    plt.imshow(img)
+    plt.title(f"True Label: {classes[label_test[i][0]]}")
+    plt.axis('off')
+    plt.show()
+
+    # Preprocess and predict the class
+    img = np.expand_dims(img / 255.0, axis=0)
+    prediction = np.argmax(model.predict(img))
+    print(f"Predicted label: {classes[prediction]}")
+# Conclusion for pridiction:
+print("Comparison of Models:")
+print(f"CNN Model - Test Accuracy: {cnn_eval[1]}")
+print(f"VGG16 Model - Test Accuracy: {vgg_eval[1]}")
+# Final results::
+if cnn_eval[1] > vgg_eval[1]:
+    print("The CNN model performed better.")
+else:
+    print("The VGG16 model performed better.")
+# Final Conclusion:
+  - During this assignment we tried working on CIFAR-10 dataset to pridict images and using our own model against a pretrained VGG16 model.
+
+# Key Observations:
+- Model performance of CNN achieved a baseline accuracy which helped me in understanding and also as a starting point for further changes.
+
+- The transfer learning model that was used as a alternative or annother means for immage classification using VGG16 outperformed my custom model and was later used as the best model for the use case...
+## confusion matrix:
+- The confusion matrix obtained from both shows inxights into the performance accross 10 classes of our CIFAR-10 dataset. However due to the high accuracy exhibited by a well balanced prediction made by VGG16 the other custom model had many misclassified classes that resulted in bad accuracy. We can see that in our confusion matrix heatmaps too..
+## Insightful training observations:
+- During the training process I found out the importance of selecting the right parameters and how a small change can impact the whole learning process including accuracy and loss. WHile the VGG16 utilized transfer learning the custom one was also very good demonstration of rightful use of hyperparameters.
+
+
+# Model prediction Results:
+The model was able to correctly predict 4 out of my 5 set ranges or we can say test images and the predictions made dispite the wrong labels set was a sign that the model is able to perdict the correct image by utilizing image classification and this pretianed model is the best fit for our project as it has the best well balanced hyperparameters and training sets.
+
+
